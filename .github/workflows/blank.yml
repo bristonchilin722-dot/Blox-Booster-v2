@@ -25,9 +25,8 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-
-      - name: Grant Execute Permission
-        run: chmod +x gradlew
+        with:
+          add-job-summary-as-pr-comment: never
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
