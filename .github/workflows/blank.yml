@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
   workflow_dispatch:
 
 jobs:
@@ -25,8 +27,12 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
-        with:
-          add-job-summary-as-pr-comment: never
+
+      - name: Accept Android SDK Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x gradlew || true
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug --stacktrace
