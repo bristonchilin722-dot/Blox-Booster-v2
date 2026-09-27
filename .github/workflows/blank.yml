@@ -4,36 +4,47 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
-  workflow_dispatch: # Allows manual triggers from the Actions tab
+  workflow_dispatch: # Allows you to manually trigger the build from the GitHub Actions tab
 
 jobs:
   build:
+    name: Build APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      # Uncomment the next block if your project is built with Flutter
+      # - name: Set up Flutter
+      #   uses: subosito/flutter-action@v2
+      #   with:
+        #   flutter-version: '3.19.x' # Use your preferred Flutter version
+        #   channel: 'stable'
+      # - name: Build Flutter APK
+      #   run: flutter build apk --release
 
-      - name: Grant Execute Permission for Gradlew
+      # Use the block below if you are using standard Android/Gradle (Native Android)
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Debug APK with Gradle
+        run: ./gradlew assembleDebug
+
+        # For a signed Release APK, use assembleRelease instead (requires signing keys setup)
+        # run: ./gradlew assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: app-apk
+          path: |
+            build/outputs/apk/debug/app-debug.apk
+            # If using Flutter, change path to: build/app/outputs/flutter-apk/app-release.apk
+            # If using native release Gradle, path might be: app/build/outputs/apk/release/app-release.apk
