@@ -1,10 +1,8 @@
 package com.example.ui.viewmodel
 
+import android.app.ActivityManager
 import android.app.Application
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +11,7 @@ import com.example.data.GameProfile
 import com.example.engine.PotatoVisualConfig
 import com.example.engine.PotatoVisualEngine
 import com.example.service.VisualOverlayService
+import com.example.util.CommandExecutionResult
 import com.example.util.DeviceHardwareInfo
 import com.example.util.DeviceSpec
 import com.example.util.FpsMetrics
@@ -21,6 +20,9 @@ import com.example.util.ResolutionManager
 import com.example.util.ResolutionPreset
 import com.example.util.ResolutionState
 import com.example.util.RobloxLauncher
+import com.example.util.ShizukuManager
+import com.example.util.ShizukuServiceStatus
+import com.example.util.ShizukuState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +41,7 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
     val visualConfig: StateFlow<PotatoVisualConfig> = PotatoVisualEngine.config
     val fpsMetrics: StateFlow<FpsMetrics> = perfMonitor.metrics
     val resolutionState: StateFlow<ResolutionState> = ResolutionManager.state
+    val shizukuState: StateFlow<ShizukuState> = ShizukuManager.state
 
     private val _deviceSpec = MutableStateFlow(DeviceHardwareInfo.getSpecs(context))
     val deviceSpec: StateFlow<DeviceSpec> = _deviceSpec.asStateFlow()
@@ -55,6 +58,9 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
     private val _hasOverlayPermission = MutableStateFlow(Settings.canDrawOverlays(context))
     val hasOverlayPermission: StateFlow<Boolean> = _hasOverlayPermission.asStateFlow()
 
+    private val _actionFeedback = MutableStateFlow<String?>(null)
+    val actionFeedback: StateFlow<String?> = _actionFeedback.asStateFlow()
+
     val savedProfiles: StateFlow<List<GameProfile>> = profileDao.getAllProfiles()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -62,6 +68,7 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
         perfMonitor.start()
         val spec = _deviceSpec.value
         ResolutionManager.init(spec.screenWidth, spec.screenHeight, spec.screenDpi)
+        ShizukuManager.init(context)
     }
 
     override fun onCleared() {
@@ -74,6 +81,18 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
         _isRobloxInstalled.value = RobloxLauncher.isRobloxInstalled(context)
         _robloxVersion.value = RobloxLauncher.getRobloxVersion(context)
         _hasOverlayPermission.value = Settings.canDrawOverlays(context)
+        ShizukuManager.checkStatus(context)
+    }
+
+    fun requestShizukuPermission() {
+        val initiated = ShizukuManager.requestPermission()
+        if (!initiated) {
+            _actionFeedback.value = ShizukuManager.state.value.lastError ?: "Cannot request Shizuku permission."
+        }
+    }
+
+    fun openShizukuApp() {
+        ShizukuManager.openShizukuApp(context)
     }
 
     fun launchRoblox() {
@@ -81,11 +100,49 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun togglePotatoVisualMode(enable: Boolean? = null) {
-        PotatoVisualEngine.togglePotatoVisualMode(enable)
+        val next = enable ?: !visualConfig.value.potatoModeActive
+        PotatoVisualEngine.togglePotatoVisualMode(next)
+
+        viewModelScope.launch {
+            if (next) {
+                // If Shizuku is authorized, automatically apply balanced 720p resolution for real GPU fillrate reduction
+                if (ShizukuManager.state.value.status == ShizukuServiceStatus.AUTHORIZED) {
+                    val spec = _deviceSpec.value
+                    val presets = ResolutionManager.getPresets(spec.screenWidth, spec.screenHeight, spec.screenDpi)
+                    val recPreset = presets.find { it.scaleFactor in 0.65f..0.75f } ?: presets.lastOrNull()
+                    if (recPreset != null) {
+                        val res = ResolutionManager.applyPreset(recPreset)
+                        if (res.success) {
+                            _actionFeedback.value = "Potato Mode Active: Applied ${recPreset.name} & high-contrast visual filters."
+                        } else {
+                            _actionFeedback.value = "Potato Visuals applied. Resolution change failed: ${res.stderr}"
+                        }
+                    }
+                } else {
+                    _actionFeedback.value = "Potato Visual Filters Active. (Shizuku not active for OS resolution downscaling)."
+                }
+                cleanMemory()
+            } else {
+                // Restore native resolution if it was scaled
+                if (resolutionState.value.isScaled) {
+                    val res = ResolutionManager.resetToNative()
+                    if (res.success) {
+                        _actionFeedback.value = "Potato Mode Deactivated: Restored native resolution and default color grading."
+                    } else {
+                        _actionFeedback.value = "Potato Mode Deactivated. (Resolution reset via ADB: ${ResolutionManager.generateResetAdbCommand()})"
+                    }
+                } else {
+                    _actionFeedback.value = "Potato Mode Deactivated: Restored default color grading."
+                }
+            }
+        }
     }
 
     fun togglePerformanceMode(enable: Boolean? = null) {
         PotatoVisualEngine.togglePerformanceMode(enable)
+        if (visualConfig.value.performanceModeActive) {
+            cleanMemory()
+        }
     }
 
     fun toggleVisualMode(enable: Boolean? = null) {
@@ -97,11 +154,65 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun applyResolutionPreset(preset: ResolutionPreset) {
-        ResolutionManager.applyPresetSimulation(preset)
+        viewModelScope.launch {
+            val result = ResolutionManager.applyPreset(preset)
+            if (result.success) {
+                _actionFeedback.value = "Applied ${preset.name} successfully."
+            } else {
+                _actionFeedback.value = "Resolution change failed (exit ${result.exitCode}): ${result.stderr.ifBlank { result.stdout }}"
+            }
+        }
+    }
+
+    fun confirmResolution() {
+        ResolutionManager.confirmCurrentResolution()
+        _actionFeedback.value = "Resolution confirmed: ${resolutionState.value.activePresetName}"
     }
 
     fun resetResolution() {
-        ResolutionManager.resetToNative()
+        viewModelScope.launch {
+            val result = ResolutionManager.resetToNative()
+            if (result.success) {
+                _actionFeedback.value = "Display resolution restored to native."
+            } else {
+                _actionFeedback.value = "Failed to reset resolution: ${result.stderr}"
+            }
+        }
+    }
+
+    fun restoreAllSettings() {
+        viewModelScope.launch {
+            // 1. Reset screen resolution
+            val resResult = ResolutionManager.resetToNative()
+            // 2. Reset visual engine
+            PotatoVisualEngine.restoreDefaults()
+            // 3. Stop overlay service
+            if (_isOverlayActive.value) {
+                VisualOverlayService.stop(context)
+                _isOverlayActive.value = false
+            }
+            // 4. Memory clean
+            cleanMemory()
+
+            val msg = if (resResult.success) {
+                "All settings restored to native defaults."
+            } else {
+                "Visual settings restored to default. Resolution reset: ${resResult.stderr.ifBlank { "Check ADB command." }}"
+            }
+            _actionFeedback.value = msg
+        }
+    }
+
+    fun cleanMemory() {
+        try {
+            val actManager = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager
+            actManager?.killBackgroundProcesses(context.packageName)
+            System.gc()
+        } catch (_: Throwable) {}
+    }
+
+    fun clearFeedback() {
+        _actionFeedback.value = null
     }
 
     fun toggleOverlayService() {
@@ -119,19 +230,22 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun applyProfile(profile: GameProfile) {
-        PotatoVisualEngine.togglePotatoVisualMode(profile.potatoVisualEnabled)
-        PotatoVisualEngine.togglePerformanceMode(profile.performanceModeEnabled)
-        PotatoVisualEngine.updateSliders(
-            saturation = profile.saturationBoost,
-            contrast = profile.contrastBoost,
-            brightness = 1.05f,
-            gamma = 1.10f
-        )
-        val spec = _deviceSpec.value
-        val presets = ResolutionManager.getPresets(spec.screenWidth, spec.screenHeight, spec.screenDpi)
-        val matchedPreset = presets.minByOrNull { kotlin.math.abs(it.scaleFactor - profile.resolutionScale) }
-        if (matchedPreset != null) {
-            ResolutionManager.applyPresetSimulation(matchedPreset)
+        viewModelScope.launch {
+            PotatoVisualEngine.togglePotatoVisualMode(profile.potatoVisualEnabled)
+            PotatoVisualEngine.togglePerformanceMode(profile.performanceModeEnabled)
+            PotatoVisualEngine.updateSliders(
+                saturation = profile.saturationBoost,
+                contrast = profile.contrastBoost,
+                brightness = 1.05f,
+                gamma = 1.15f
+            )
+            val spec = _deviceSpec.value
+            val presets = ResolutionManager.getPresets(spec.screenWidth, spec.screenHeight, spec.screenDpi)
+            val matchedPreset = presets.minByOrNull { kotlin.math.abs(it.scaleFactor - profile.resolutionScale) }
+            if (matchedPreset != null) {
+                ResolutionManager.applyPreset(matchedPreset)
+            }
+            _actionFeedback.value = "Profile '${profile.name}' applied."
         }
     }
 
@@ -152,12 +266,14 @@ class BloxBoosterViewModel(application: Application) : AndroidViewModel(applicat
                 description = description
             )
             profileDao.insertProfile(profile)
+            _actionFeedback.value = "Custom profile '$name' created."
         }
     }
 
     fun deleteProfile(profile: GameProfile) {
         viewModelScope.launch {
             profileDao.deleteProfile(profile)
+            _actionFeedback.value = "Profile '${profile.name}' deleted."
         }
     }
 }

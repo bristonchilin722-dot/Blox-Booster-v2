@@ -1,8 +1,12 @@
 package com.example.ui.screens
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -26,12 +30,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tv
@@ -62,6 +70,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -87,6 +96,7 @@ import com.example.ui.theme.TextPrimary
 import com.example.ui.theme.TextSecondary
 import com.example.ui.viewmodel.BloxBoosterViewModel
 import com.example.util.ResolutionManager
+import com.example.util.ShizukuServiceStatus
 
 @Composable
 fun HomeScreen(
@@ -100,10 +110,11 @@ fun HomeScreen(
     val fpsMetrics by viewModel.fpsMetrics.collectAsState()
     val deviceSpec by viewModel.deviceSpec.collectAsState()
     val resolutionState by viewModel.resolutionState.collectAsState()
+    val shizukuState by viewModel.shizukuState.collectAsState()
     val isRobloxInstalled by viewModel.isRobloxInstalled.collectAsState()
     val robloxVersion by viewModel.robloxVersion.collectAsState()
     val isOverlayActive by viewModel.isOverlayActive.collectAsState()
-    val hasOverlayPerm by viewModel.hasOverlayPermission.collectAsState()
+    val actionFeedback by viewModel.actionFeedback.collectAsState()
 
     var showOverlayPermDialog by remember { mutableStateOf(false) }
 
@@ -165,11 +176,112 @@ fun HomeScreen(
                 }
 
                 StatusBadge(
-                    text = if (resolutionState.isShizukuAvailable) "SHIZUKU READY" else "ADB SCALER",
-                    isActive = resolutionState.isShizukuAvailable,
+                    text = when (shizukuState.status) {
+                        ShizukuServiceStatus.AUTHORIZED -> "SHIZUKU READY"
+                        ShizukuServiceStatus.PERMISSION_REQUIRED -> "AUTH NEEDED"
+                        ShizukuServiceStatus.SERVICE_STOPPED -> "SHIZUKU OFF"
+                        ShizukuServiceStatus.NOT_INSTALLED -> "ADB ONLY"
+                    },
+                    isActive = shizukuState.status == ShizukuServiceStatus.AUTHORIZED,
                     activeColor = CyberGreen,
-                    inactiveColor = CyberCyan
+                    inactiveColor = when (shizukuState.status) {
+                        ShizukuServiceStatus.PERMISSION_REQUIRED -> CyberAmber
+                        else -> TextMuted
+                    }
                 )
+            }
+        }
+
+        // Live Action Feedback Banner
+        actionFeedback?.let { feedback ->
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "SYSTEM FEEDBACK",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NeonPurpleLight
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = feedback,
+                                fontSize = 12.sp,
+                                color = TextPrimary
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = TextSecondary,
+                            modifier = Modifier
+                                .size(20.dp)
+                                .clickable { viewModel.clearFeedback() }
+                        )
+                    }
+                }
+            }
+        }
+
+        // Auto-revert countdown safety alert (if awaiting confirmation)
+        if (resolutionState.isAwaitingConfirmation) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF331500)),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, CyberAmber)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Warning, contentDescription = "Safety Alert", tint = CyberAmber, modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Safety Revert: ${resolutionState.revertTimerSeconds}s",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = CyberAmber
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "New resolution applied. Auto-reverting if not confirmed.",
+                            fontSize = 12.sp,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.confirmResolution() },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("KEEP RESOLUTION", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                            Button(
+                                onClick = { viewModel.resetResolution() },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurface, contentColor = TextPrimary),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("REVERT NOW", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
 
@@ -181,7 +293,7 @@ fun HomeScreen(
                     .testTag("hero_banner_card")
                     .border(1.5.dp, NeonPurple, RoundedCornerShape(20.dp)),
                 shape = RoundedCornerShape(20.dp),
-                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkSurfaceElevated)
+                colors = CardDefaults.cardColors(containerColor = DarkSurfaceElevated)
             ) {
                 Box(
                     modifier = Modifier
@@ -205,7 +317,7 @@ fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 val statusText = when {
-                                    visualConfig.potatoModeActive -> "POTATO VISUAL ENGINE: ACTIVE"
+                                    visualConfig.potatoModeActive -> "POTATO MODE: ACTIVE"
                                     visualConfig.performanceModeActive -> "PERFORMANCE MODE: READY"
                                     else -> "OPTIMIZATION ENGINE: STANDBY"
                                 }
@@ -227,9 +339,9 @@ fun HomeScreen(
 
                                 Text(
                                     text = if (visualConfig.potatoModeActive)
-                                        "Lightweight Max Visuals Active"
+                                        "Potato Visuals & Fillrate Relief"
                                     else
-                                        "Enhance Low-End Roblox Visuals",
+                                        "Optimize Roblox Framerates",
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimary
@@ -298,27 +410,209 @@ fun HomeScreen(
             }
         }
 
-        // 3. The Revolutionary Potato Visual Mode & Core Toggles
+        // 3. Official Shizuku Integration Card
+        item {
+            CyberCard(
+                borderColor = when (shizukuState.status) {
+                    ShizukuServiceStatus.AUTHORIZED -> CyberGreen
+                    ShizukuServiceStatus.PERMISSION_REQUIRED -> CyberAmber
+                    else -> DarkCardBorder
+                }
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Security,
+                                contentDescription = "Shizuku",
+                                tint = when (shizukuState.status) {
+                                    ShizukuServiceStatus.AUTHORIZED -> CyberGreen
+                                    ShizukuServiceStatus.PERMISSION_REQUIRED -> CyberAmber
+                                    else -> CyberCyan
+                                },
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "OFFICIAL SHIZUKU INTEGRATION",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        StatusBadge(
+                            text = when (shizukuState.status) {
+                                ShizukuServiceStatus.AUTHORIZED -> "AUTHORIZED"
+                                ShizukuServiceStatus.PERMISSION_REQUIRED -> "NEEDS PERMISSION"
+                                ShizukuServiceStatus.SERVICE_STOPPED -> "SERVICE OFF"
+                                ShizukuServiceStatus.NOT_INSTALLED -> "NOT INSTALLED"
+                            },
+                            isActive = shizukuState.status == ShizukuServiceStatus.AUTHORIZED,
+                            activeColor = CyberGreen,
+                            inactiveColor = when (shizukuState.status) {
+                                ShizukuServiceStatus.PERMISSION_REQUIRED -> CyberAmber
+                                else -> TextMuted
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = when (shizukuState.status) {
+                            ShizukuServiceStatus.AUTHORIZED ->
+                                "Shizuku v${shizukuState.shizukuVersion} active. OS display scaling commands (`wm size/density`) execute with genuine elevated permissions."
+                            ShizukuServiceStatus.PERMISSION_REQUIRED ->
+                                "Shizuku service is running, but Blox Booster needs authorization to scale resolutions."
+                            ShizukuServiceStatus.SERVICE_STOPPED ->
+                                "Shizuku app is installed, but the service has not been started. Start it via Wireless Debugging."
+                            ShizukuServiceStatus.NOT_INSTALLED ->
+                                "Shizuku allows 1-tap resolution scaling without a PC connection each reboot. You can also run commands via ADB."
+                        },
+                        fontSize = 11.sp,
+                        color = TextSecondary,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (shizukuState.status == ShizukuServiceStatus.PERMISSION_REQUIRED) {
+                            Button(
+                                onClick = { viewModel.requestShizukuPermission() },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberAmber, contentColor = Color.Black)
+                            ) {
+                                Text("GRANT PERMISSION", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+
+                        Button(
+                            onClick = { viewModel.openShizukuApp() },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated, contentColor = TextPrimary),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple)
+                        ) {
+                            Text(
+                                text = if (shizukuState.isInstalled) "OPEN SHIZUKU" else "GET SHIZUKU",
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        Button(
+                            onClick = { viewModel.refreshState() },
+                            modifier = Modifier.size(38.dp),
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. POTATO MODE (Star Feature)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("potato_mode_card")
+                    .border(1.5.dp, if (visualConfig.potatoModeActive) PotatoGold else DarkCardBorder, RoundedCornerShape(16.dp)),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (visualConfig.potatoModeActive) Color(0xFF1E1700) else DarkSurface
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ColorLens,
+                                contentDescription = "Potato Mode",
+                                tint = PotatoGold,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "POTATO MODE",
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = if (visualConfig.potatoModeActive) "ACTIVE & OPTIMIZING" else "TAP TO ACTIVATE",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (visualConfig.potatoModeActive) PotatoGold else TextMuted
+                                )
+                            }
+                        }
+
+                        Button(
+                            onClick = { viewModel.togglePotatoVisualMode() },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (visualConfig.potatoModeActive) PotatoGold else NeonPurple,
+                                contentColor = Color.Black
+                            ),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                text = if (visualConfig.potatoModeActive) "DISABLE" else "ENABLE",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 12.sp
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "How Potato Mode Optimizes Roblox:",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "• APPLIED: Cuts GPU pixel shader workload by up to 55-75% via OS resolution scaling (720p/540p), clears memory caches, and lifts shadow gamma (+15%) so enemies/items remain visible when in-game graphics are lowered.\n" +
+                                "• UNAVAILABLE IN-APP: Roblox game engine polygon count and draw distance cannot be injected externally; set Graphics Mode to Manual (level 1-2) inside Roblox.",
+                        fontSize = 10.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        }
+
+        // 5. Core Performance Toggles
         item {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
-                    text = "OPTIMIZATION MODES",
+                    text = "ADDITIONAL SYSTEM ENHANCEMENTS",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.ExtraBold,
                     letterSpacing = 1.sp,
                     color = TextSecondary
-                )
-
-                // 🥔 POTATO VISUAL MODE (Star Feature)
-                ToggleFeatureCard(
-                    title = "Potato Visual Mode",
-                    subtitle = "Revolutionary lightweight rendering: mimics maximum graphics appearance while heavily reducing GPU shader strain.",
-                    icon = Icons.Default.ColorLens,
-                    iconColor = PotatoGold,
-                    isChecked = visualConfig.potatoModeActive,
-                    onCheckedChange = { viewModel.togglePotatoVisualMode(it) },
-                    testTag = "potato_visual_mode_toggle",
-                    badgeText = "STAR FEATURE"
                 )
 
                 // ⚡ PERFORMANCE MODE
@@ -345,11 +639,11 @@ fun HomeScreen(
             }
         }
 
-        // 4. Real-Time FPS & Hardware Performance Monitor
+        // 6. Real-Time FPS & Hardware Performance Monitor (Transparent & Honest)
         item {
             CyberCard(
-                borderColor = if (fpsMetrics.currentFps >= 50) CyberCyan else NeonPurple,
-                modifier = Modifier.testTag("fps_monitor_card")
+                borderColor = DarkCardBorder,
+                modifier = Modifier.testTag("fps_performance_monitor_card")
             ) {
                 Column {
                     Row(
@@ -360,13 +654,13 @@ fun HomeScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.Speed,
-                                contentDescription = "FPS Monitor",
-                                tint = CyberCyan,
-                                modifier = Modifier.size(22.dp)
+                                contentDescription = "FPS",
+                                tint = CyberGreen,
+                                modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "REAL-TIME FPS & STABILITY",
+                                text = "DISPLAY PACING & HARDWARE MONITOR",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -374,128 +668,74 @@ fun HomeScreen(
                         }
 
                         StatusBadge(
-                            text = "${fpsMetrics.frameStabilityPercent}% STABLE",
-                            isActive = fpsMetrics.frameStabilityPercent >= 90,
-                            activeColor = CyberGreen,
-                            inactiveColor = CyberAmber
+                            text = "${fpsMetrics.currentFps} FPS",
+                            isActive = true,
+                            activeColor = if (fpsMetrics.currentFps >= 50) CyberGreen else CyberAmber
                         )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Live Metrics Grid
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // FPS Meter Box
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DarkSurface)
-                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Column {
+                            Text(text = "Display Frame Rate", fontSize = 11.sp, color = TextMuted)
+                            Row(verticalAlignment = Alignment.Bottom) {
                                 Text(
                                     text = "${fpsMetrics.currentFps}",
                                     fontSize = 32.sp,
                                     fontWeight = FontWeight.Black,
-                                    color = when {
-                                        fpsMetrics.currentFps >= 55 -> CyberCyan
-                                        fpsMetrics.currentFps >= 35 -> PotatoGold
-                                        else -> CyberPink
-                                    }
-                                )
-                                Text(
-                                    text = "CURRENT FPS",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextSecondary
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // Frame Time Box
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DarkSurface)
-                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${fpsMetrics.frameTimeMs}ms",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Black,
                                     color = TextPrimary
                                 )
                                 Text(
-                                    text = "FRAME TIME",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextSecondary
+                                    text = " / ${deviceSpec.refreshRateHz} Hz",
+                                    fontSize = 13.sp,
+                                    color = TextSecondary,
+                                    modifier = Modifier.padding(bottom = 4.dp, start = 4.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(10.dp))
-
-                        // 1% Low Box
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(DarkSurface)
-                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
-                                .padding(12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "${fpsMetrics.onePercentLowFps}",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = NeonPurpleLight
-                                )
-                                Text(
-                                    text = "1% LOW FPS",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextSecondary
-                                )
-                            }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(text = "1% Lows (Pacing)", fontSize = 11.sp, color = TextMuted)
+                            Text(
+                                text = "${fpsMetrics.onePercentLowFps} FPS",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (fpsMetrics.onePercentLowFps >= 45) CyberGreen else CyberAmber
+                            )
+                            Text(
+                                text = "${fpsMetrics.frameStabilityPercent}% Stable",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // RAM Utilization Progress
+                    // RAM Usage Bar
                     Column {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
+                            val usedRam = (deviceSpec.totalRamMb - deviceSpec.availableRamMb).coerceAtLeast(0)
                             Text(
-                                text = "RAM Usage (${deviceSpec.ramUsagePercent}%)",
+                                text = "RAM: ${usedRam}MB / ${deviceSpec.totalRamMb}MB",
                                 fontSize = 11.sp,
                                 color = TextSecondary
                             )
                             Text(
-                                text = "${deviceSpec.totalRamMb - deviceSpec.availableRamMb} MB / ${deviceSpec.totalRamMb} MB",
+                                text = "${deviceSpec.ramUsagePercent}%",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = TextPrimary
+                                color = if (deviceSpec.ramUsagePercent > 80) CyberAmber else CyberGreen
                             )
                         }
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         LinearProgressIndicator(
                             progress = { deviceSpec.ramUsagePercent / 100f },
                             modifier = Modifier
@@ -572,7 +812,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Verified Choreographer frame timing • Zero simulated FPS",
+                            text = "Choreographer display sync timing • No simulated metrics",
                             fontSize = 10.sp,
                             color = TextMuted
                         )
@@ -581,7 +821,7 @@ fun HomeScreen(
             }
         }
 
-        // 5. Quick Resolution Optimizer
+        // 7. Quick Resolution Optimizer
         item {
             CyberCard(
                 borderColor = DarkCardBorder,
@@ -679,7 +919,72 @@ fun HomeScreen(
             }
         }
 
-        // 6. Device Hardware Performance Information (e.g. Poco C71 support)
+        // 8. Restore Native Settings Button (Requirement 5)
+        item {
+            OutlinedButton(
+                onClick = { viewModel.restoreAllSettings() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp)
+                    .testTag("restore_native_settings_button"),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NeonPurple),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Restore,
+                    contentDescription = "Restore Defaults",
+                    tint = NeonPurpleLight,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "RESTORE ALL NATIVE SETTINGS",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NeonPurpleLight
+                )
+            }
+        }
+
+        // 9. Roblox Client Settings & Technical Investigation Info (Requirement 2)
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = DarkSurface)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Roblox Client Info",
+                            tint = CyberCyan,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Roblox Android & ClientAppSettings Investigation",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "• ClientAppSettings.json / FFlags: Unlike Windows Bloxstrap, Roblox's native Android client does NOT load ClientAppSettings from external storage. Android's SELinux policy blocks third-party apps from injecting into private package data without root.\n" +
+                                "• Account Safety: Third-party APK injectors risk account bans. Blox Booster never touches Roblox binaries.\n" +
+                                "• Best Practice: Use Blox Booster's Shizuku resolution downscaling + Potato color grading, then set Roblox in-game graphics to Manual (level 1–3).",
+                        fontSize = 10.sp,
+                        color = TextSecondary,
+                        lineHeight = 15.sp
+                    )
+                }
+            }
+        }
+
+        // 10. Device Hardware Specs (Android 15 verified)
         item {
             CyberCard(borderColor = DarkCardBorder) {
                 Column {
@@ -760,47 +1065,6 @@ fun HomeScreen(
                             Text(text = "Battery Level", fontSize = 11.sp, color = TextMuted)
                             Text(text = "${deviceSpec.batteryPercent}% ${if (deviceSpec.isCharging) "(Charging)" else ""}", fontSize = 12.sp, color = TextPrimary)
                         }
-                    }
-                }
-            }
-        }
-
-        // 7. Safety, Anti-Cheat, and Platform Compliance Notice
-        item {
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp)),
-                shape = RoundedCornerShape(12.dp),
-                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkSurface)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = "Safe",
-                        tint = NeonPurpleLight,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .padding(top = 2.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Legitimate & Account Safe",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Blox Booster operates exclusively via native Android OS display scaling & SurfaceFlinger color grading. We never modify Roblox game files, inject hooks, or violate Terms of Service.",
-                            fontSize = 10.sp,
-                            color = TextSecondary,
-                            lineHeight = 15.sp
-                        )
                     }
                 }
             }

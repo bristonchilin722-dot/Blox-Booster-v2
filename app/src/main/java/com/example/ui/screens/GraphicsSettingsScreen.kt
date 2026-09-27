@@ -90,6 +90,7 @@ fun GraphicsSettingsScreen(
     val context = LocalContext.current
     val visualConfig by viewModel.visualConfig.collectAsState()
     val resolutionState by viewModel.resolutionState.collectAsState()
+    val shizukuState by viewModel.shizukuState.collectAsState()
     val deviceSpec by viewModel.deviceSpec.collectAsState()
 
     var saturation by remember(visualConfig.saturation) { mutableFloatStateOf(visualConfig.saturation) }
@@ -107,6 +108,52 @@ fun GraphicsSettingsScreen(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        // Safety Revert Countdown if waiting for confirmation
+        if (resolutionState.isAwaitingConfirmation) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF331500)),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, CyberAmber)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "Safety Revert Active: ${resolutionState.revertTimerSeconds}s",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = CyberAmber
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Awaiting confirmation. Display will automatically revert if unconfirmed.",
+                            fontSize = 12.sp,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { viewModel.confirmResolution() },
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = Color.Black),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("KEEP RESOLUTION", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                            Button(
+                                onClick = { viewModel.resetResolution() },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurface, contentColor = TextPrimary),
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("REVERT NOW", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         // Screen Header
         item {
@@ -447,6 +494,59 @@ fun GraphicsSettingsScreen(
                         )
                     }
 
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Shizuku execution status indicator
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurfaceElevated)
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Shizuku Status",
+                            tint = when (shizukuState.status) {
+                                com.example.util.ShizukuServiceStatus.AUTHORIZED -> CyberGreen
+                                com.example.util.ShizukuServiceStatus.PERMISSION_REQUIRED -> CyberAmber
+                                else -> TextMuted
+                            },
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = when (shizukuState.status) {
+                                com.example.util.ShizukuServiceStatus.AUTHORIZED -> "Shizuku Authorized: Commands execute with 1-tap"
+                                com.example.util.ShizukuServiceStatus.PERMISSION_REQUIRED -> "Shizuku Needs Permission: Tap on Home screen to authorize"
+                                com.example.util.ShizukuServiceStatus.SERVICE_STOPPED -> "Shizuku Service Stopped: Use ADB fallback below"
+                                com.example.util.ShizukuServiceStatus.NOT_INSTALLED -> "Shizuku Not Installed: Use ADB fallback below"
+                            },
+                            fontSize = 10.sp,
+                            color = TextSecondary
+                        )
+                    }
+
+                    resolutionState.lastError?.let { err ->
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Error: $err",
+                            fontSize = 11.sp,
+                            color = CyberAmber,
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    resolutionState.lastExecutionLog?.let { logMsg ->
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = logMsg,
+                            fontSize = 10.sp,
+                            color = TextMuted
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
@@ -620,17 +720,20 @@ fun GraphicsSettingsScreen(
             CyberCard(borderColor = DarkCardBorder) {
                 Column {
                     Text(
-                        text = "ROBLOX IN-GAME OPTIMIZATION BEST PRACTICES",
+                        text = "ROBLOX ANDROID CLIENT SETTINGS & INVESTIGATION",
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "1. In Roblox Settings, switch Graphics Mode to 'Manual' and set slider to 1 or 2. Blox Booster's Potato Visual Mode restores the color and contrast loss!\n" +
-                                "2. Disable 'Camera Shake' to eliminate micro-stutters during combat abilities.\n" +
-                                "3. Lower Roblox master volume to 50% on lower-end devices to relieve the audio thread from heavy sound mixing.\n" +
-                                "4. In Android Developer Options, set 'Window Animation Scale' to 0.5x for faster UI navigation.",
+                        text = "• ClientAppSettings.json on Android: On Windows, Bloxstrap writes FFlags to ClientAppSettings.json in appdata. On Android, Roblox's native ARM64 engine ignores external JSON files, and Android's SELinux policy prevents writing into /data/data/com.roblox.client without root. Modifying APKs or injecting hooks violates Roblox Terms of Service and triggers tamper detection.\n\n" +
+                                "• Supported Optimization Pipeline: Blox Booster operates legally through Android's OS display scaling (`wm size/density`) and SurfaceFlinger color grading, drastically relieving GPU fillrate without modifying game files.\n\n" +
+                                "• Recommended In-Game Settings:\n" +
+                                "   1. Set Graphics Mode to 'Manual' and slide to 1 or 2 bars.\n" +
+                                "   2. Disable 'Camera Shake' to eliminate micro-stutters during combat.\n" +
+                                "   3. Turn off 'Reduced Motion' if animations feel delayed.\n" +
+                                "   4. Lower in-game master volume to 50% to reduce audio thread mixing CPU load.",
                         fontSize = 11.sp,
                         color = TextSecondary,
                         lineHeight = 17.sp
