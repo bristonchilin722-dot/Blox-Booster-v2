@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows you to manually trigger the build from the GitHub Actions tab
+  workflow_dispatch:
 
 jobs:
   build:
-    name: Build APK
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
@@ -21,30 +21,17 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # Uncomment the next block if your project is built with Flutter
-      # - name: Set up Flutter
-      #   uses: subosito/flutter-action@v2
-      #   with:
-        #   flutter-version: '3.19.x' # Use your preferred Flutter version
-        #   channel: 'stable'
-      # - name: Build Flutter APK
-      #   run: flutter build apk --release
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      # Use the block below if you are using standard Android/Gradle (Native Android)
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK with Gradle
+      - name: Build Debug APK
         run: ./gradlew assembleDebug
-
-        # For a signed Release APK, use assembleRelease instead (requires signing keys setup)
-        # run: ./gradlew assembleRelease
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: app-apk
-          path: |
-            build/outputs/apk/debug/app-debug.apk
-            # If using Flutter, change path to: build/app/outputs/flutter-apk/app-release.apk
-            # If using native release Gradle, path might be: app/build/outputs/apk/release/app-release.apk
+          name: app-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
