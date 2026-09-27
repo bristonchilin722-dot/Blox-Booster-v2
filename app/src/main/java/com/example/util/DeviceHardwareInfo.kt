@@ -43,32 +43,52 @@ object DeviceHardwareInfo {
             (((totalRamMb - availRamMb).toDouble() / totalRamMb) * 100).toInt()
         } else 0
 
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         var width = 1080
         var height = 2400
         var refreshRate = 60
 
+        try {
+            val dm = context.resources.displayMetrics
+            width = dm.widthPixels
+            height = dm.heightPixels
+        } catch (_: Throwable) {}
+
+        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
         if (wm != null) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                val bounds = wm.currentWindowMetrics.bounds
-                width = bounds.width()
-                height = bounds.height()
-                val display = context.display
-                refreshRate = display?.refreshRate?.toInt() ?: 60
-            } else {
-                @Suppress("DEPRECATION")
-                val display = wm.defaultDisplay
-                val size = Point()
-                @Suppress("DEPRECATION")
-                display.getRealSize(size)
-                width = size.x
-                height = size.y
-                @Suppress("DEPRECATION")
-                refreshRate = display.refreshRate.toInt()
-            }
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    val bounds = wm.currentWindowMetrics.bounds
+                    if (bounds.width() > 0 && bounds.height() > 0) {
+                        width = bounds.width()
+                        height = bounds.height()
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    val display = wm.defaultDisplay
+                    val size = Point()
+                    @Suppress("DEPRECATION")
+                    display.getRealSize(size)
+                    if (size.x > 0 && size.y > 0) {
+                        width = size.x
+                        height = size.y
+                    }
+                }
+            } catch (_: Throwable) {}
         }
 
-        val dpi = context.resources.displayMetrics.densityDpi
+        try {
+            val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? android.hardware.display.DisplayManager
+            val display = displayManager?.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+            refreshRate = display?.refreshRate?.toInt() ?: 60
+        } catch (_: Throwable) {
+            refreshRate = 60
+        }
+
+        val dpi = try {
+            context.resources.displayMetrics.densityDpi
+        } catch (_: Throwable) {
+            400
+        }
 
         // Battery
         val batteryFilter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
