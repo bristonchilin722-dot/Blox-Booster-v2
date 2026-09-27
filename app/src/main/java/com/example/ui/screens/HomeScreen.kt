@@ -1,0 +1,869 @@
+package com.example.ui.screens
+
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Thermostat
+import androidx.compose.material.icons.filled.Tv
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.R
+import com.example.ui.components.CyberCard
+import com.example.ui.components.StatusBadge
+import com.example.ui.components.ToggleFeatureCard
+import com.example.ui.theme.CyberAmber
+import com.example.ui.theme.CyberCyan
+import com.example.ui.theme.CyberGreen
+import com.example.ui.theme.CyberPink
+import com.example.ui.theme.DarkBg
+import com.example.ui.theme.DarkCardBorder
+import com.example.ui.theme.DarkSurface
+import com.example.ui.theme.DarkSurfaceElevated
+import com.example.ui.theme.NeonPurple
+import com.example.ui.theme.NeonPurpleDark
+import com.example.ui.theme.NeonPurpleGlow
+import com.example.ui.theme.NeonPurpleLight
+import com.example.ui.theme.PotatoGold
+import com.example.ui.theme.TextMuted
+import com.example.ui.theme.TextPrimary
+import com.example.ui.theme.TextSecondary
+import com.example.ui.viewmodel.BloxBoosterViewModel
+import com.example.util.ResolutionManager
+
+@Composable
+fun HomeScreen(
+    viewModel: BloxBoosterViewModel,
+    onNavigateToSettings: () -> Unit,
+    onNavigateToProfiles: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val visualConfig by viewModel.visualConfig.collectAsState()
+    val fpsMetrics by viewModel.fpsMetrics.collectAsState()
+    val deviceSpec by viewModel.deviceSpec.collectAsState()
+    val resolutionState by viewModel.resolutionState.collectAsState()
+    val isRobloxInstalled by viewModel.isRobloxInstalled.collectAsState()
+    val robloxVersion by viewModel.robloxVersion.collectAsState()
+    val isOverlayActive by viewModel.isOverlayActive.collectAsState()
+    val hasOverlayPerm by viewModel.hasOverlayPermission.collectAsState()
+
+    var showOverlayPermDialog by remember { mutableStateOf(false) }
+
+    LazyColumn(
+        modifier = modifier
+            .fillMaxSize()
+            .background(DarkBg)
+            .padding(horizontal = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        item { Spacer(modifier = Modifier.height(8.dp)) }
+
+        // 1. Top Brand Header with Balaclava Logo
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.5.dp, NeonPurple, RoundedCornerShape(12.dp))
+                            .background(DarkSurfaceElevated),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_blox_icon),
+                            contentDescription = "Blox Booster Balaclava Logo",
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(RoundedCornerShape(10.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "BLOX BOOSTER",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "POTATO GRAPHICS & VISUAL OPTIMIZER",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = NeonPurpleLight
+                        )
+                    }
+                }
+
+                StatusBadge(
+                    text = if (resolutionState.isShizukuAvailable) "SHIZUKU READY" else "ADB SCALER",
+                    isActive = resolutionState.isShizukuAvailable,
+                    activeColor = CyberGreen,
+                    inactiveColor = CyberCyan
+                )
+            }
+        }
+
+        // 2. Main Hero Card with Balaclava Art & Big Launch Roblox Button
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("hero_banner_card")
+                    .border(1.5.dp, NeonPurple, RoundedCornerShape(20.dp)),
+                shape = RoundedCornerShape(20.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkSurfaceElevated)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF241544),
+                                    DarkSurfaceElevated,
+                                    DarkSurface
+                                )
+                            )
+                        )
+                        .padding(18.dp)
+                ) {
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                val statusText = when {
+                                    visualConfig.potatoModeActive -> "POTATO VISUAL ENGINE: ACTIVE"
+                                    visualConfig.performanceModeActive -> "PERFORMANCE MODE: READY"
+                                    else -> "OPTIMIZATION ENGINE: STANDBY"
+                                }
+                                val statusColor = when {
+                                    visualConfig.potatoModeActive -> PotatoGold
+                                    visualConfig.performanceModeActive -> CyberCyan
+                                    else -> TextSecondary
+                                }
+
+                                Text(
+                                    text = statusText,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = statusColor,
+                                    letterSpacing = 0.5.sp
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = if (visualConfig.potatoModeActive)
+                                        "Lightweight Max Visuals Active"
+                                    else
+                                        "Enhance Low-End Roblox Visuals",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                Text(
+                                    text = if (isRobloxInstalled)
+                                        "Roblox client ready ${robloxVersion?.let { "• v$it" } ?: ""}"
+                                    else
+                                        "Roblox client not detected (tap to get)",
+                                    fontSize = 12.sp,
+                                    color = if (isRobloxInstalled) CyberGreen else CyberAmber
+                                )
+                            }
+
+                            // Balaclava Mascot Emblem
+                            Box(
+                                modifier = Modifier
+                                    .size(68.dp)
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .border(2.dp, NeonPurple, RoundedCornerShape(16.dp))
+                                    .background(Color.Black),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_blox_icon),
+                                    contentDescription = "Blox Balaclava Graphic",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Large Launch Roblox Action Button
+                        Button(
+                            onClick = { viewModel.launchRoblox() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .testTag("launch_roblox_button"),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = NeonPurple,
+                                contentColor = Color.Black
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = "Launch",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (isRobloxInstalled) "LAUNCH ROBLOX WITH OPTIMIZATIONS" else "INSTALL / LAUNCH ROBLOX",
+                                fontWeight = FontWeight.Black,
+                                fontSize = 14.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. The Revolutionary Potato Visual Mode & Core Toggles
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    text = "OPTIMIZATION MODES",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    letterSpacing = 1.sp,
+                    color = TextSecondary
+                )
+
+                // 🥔 POTATO VISUAL MODE (Star Feature)
+                ToggleFeatureCard(
+                    title = "Potato Visual Mode",
+                    subtitle = "Revolutionary lightweight rendering: mimics maximum graphics appearance while heavily reducing GPU shader strain.",
+                    icon = Icons.Default.ColorLens,
+                    iconColor = PotatoGold,
+                    isChecked = visualConfig.potatoModeActive,
+                    onCheckedChange = { viewModel.togglePotatoVisualMode(it) },
+                    testTag = "potato_visual_mode_toggle",
+                    badgeText = "STAR FEATURE"
+                )
+
+                // ⚡ PERFORMANCE MODE
+                ToggleFeatureCard(
+                    title = "Performance Mode",
+                    subtitle = "Prioritizes smooth frametimes, touch latency mitigation, and frees low-priority system RAM caches.",
+                    icon = Icons.Default.Bolt,
+                    iconColor = CyberCyan,
+                    isChecked = visualConfig.performanceModeActive,
+                    onCheckedChange = { viewModel.togglePerformanceMode(it) },
+                    testTag = "performance_mode_toggle"
+                )
+
+                // 🎨 VISUAL ENHANCEMENT MODE
+                ToggleFeatureCard(
+                    title = "Visual Enhancement Mode",
+                    subtitle = "Rich color vibrance, deep shadows & ambient clarity with zero GPU rendering overhead.",
+                    icon = Icons.Default.Visibility,
+                    iconColor = NeonPurple,
+                    isChecked = visualConfig.visualModeActive,
+                    onCheckedChange = { viewModel.toggleVisualMode(it) },
+                    testTag = "visual_mode_toggle"
+                )
+            }
+        }
+
+        // 4. Real-Time FPS & Hardware Performance Monitor
+        item {
+            CyberCard(
+                borderColor = if (fpsMetrics.currentFps >= 50) CyberCyan else NeonPurple,
+                modifier = Modifier.testTag("fps_monitor_card")
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = "FPS Monitor",
+                                tint = CyberCyan,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "REAL-TIME FPS & STABILITY",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        StatusBadge(
+                            text = "${fpsMetrics.frameStabilityPercent}% STABLE",
+                            isActive = fpsMetrics.frameStabilityPercent >= 90,
+                            activeColor = CyberGreen,
+                            inactiveColor = CyberAmber
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Live Metrics Grid
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        // FPS Meter Box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DarkSurface)
+                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${fpsMetrics.currentFps}",
+                                    fontSize = 32.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = when {
+                                        fpsMetrics.currentFps >= 55 -> CyberCyan
+                                        fpsMetrics.currentFps >= 35 -> PotatoGold
+                                        else -> CyberPink
+                                    }
+                                )
+                                Text(
+                                    text = "CURRENT FPS",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // Frame Time Box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DarkSurface)
+                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${fpsMetrics.frameTimeMs}ms",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = TextPrimary
+                                )
+                                Text(
+                                    text = "FRAME TIME",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(10.dp))
+
+                        // 1% Low Box
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(DarkSurface)
+                                .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "${fpsMetrics.onePercentLowFps}",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = NeonPurpleLight
+                                )
+                                Text(
+                                    text = "1% LOW FPS",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextSecondary
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // RAM Utilization Progress
+                    Column {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = "RAM Usage (${deviceSpec.ramUsagePercent}%)",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = "${deviceSpec.totalRamMb - deviceSpec.availableRamMb} MB / ${deviceSpec.totalRamMb} MB",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { deviceSpec.ramUsagePercent / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp)),
+                            color = if (deviceSpec.ramUsagePercent > 80) CyberAmber else NeonPurple,
+                            trackColor = DarkSurface
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Floating Overlay HUD Toggle Button
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "In-Game Floating HUD",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                            Text(
+                                text = "Display real FPS & Potato toggle over Roblox",
+                                fontSize = 11.sp,
+                                color = TextSecondary
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                if (Settings.canDrawOverlays(context)) {
+                                    viewModel.toggleOverlayService()
+                                } else {
+                                    showOverlayPermDialog = true
+                                }
+                            },
+                            modifier = Modifier.testTag("toggle_floating_hud_button"),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isOverlayActive) CyberGreen else DarkSurfaceElevated,
+                                contentColor = if (isOverlayActive) Color.Black else TextPrimary
+                            ),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (isOverlayActive) CyberGreen else NeonPurple)
+                        ) {
+                            Text(
+                                text = if (isOverlayActive) "HUD ACTIVE" else "ENABLE HUD",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Honest Measurement Disclosure Badge
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(DarkSurface.copy(alpha = 0.7f))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "Verified",
+                            tint = CyberGreen,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Verified Choreographer frame timing • Zero simulated FPS",
+                            fontSize = 10.sp,
+                            color = TextMuted
+                        )
+                    }
+                }
+            }
+        }
+
+        // 5. Quick Resolution Optimizer
+        item {
+            CyberCard(
+                borderColor = DarkCardBorder,
+                modifier = Modifier.testTag("quick_resolution_card")
+            ) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Tv,
+                                contentDescription = "Resolution",
+                                tint = NeonPurpleLight,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "RESOLUTION SCALING (GPU RELIEF)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        Text(
+                            text = "Settings ->",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NeonPurpleLight,
+                            modifier = Modifier.clickable { onNavigateToSettings() }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Current: ${resolutionState.currentWidth}x${resolutionState.currentHeight} (${resolutionState.activePresetName})",
+                        fontSize = 12.sp,
+                        color = TextSecondary
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val presets = ResolutionManager.getPresets(
+                        deviceSpec.screenWidth,
+                        deviceSpec.screenHeight,
+                        deviceSpec.screenDpi
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        presets.forEach { preset ->
+                            val isSelected = resolutionState.activePresetName == preset.name
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(
+                                        1.dp,
+                                        if (isSelected) NeonPurple else DarkCardBorder,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .background(if (isSelected) NeonPurpleDark.copy(alpha = 0.5f) else DarkSurface)
+                                    .clickable { viewModel.applyResolutionPreset(preset) }
+                                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = when {
+                                            preset.scaleFactor <= 0.55f -> "540p"
+                                            preset.scaleFactor <= 0.70f -> "720p"
+                                            preset.scaleFactor <= 0.85f -> "900p"
+                                            else -> "Native"
+                                        },
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isSelected) NeonPurpleLight else TextPrimary
+                                    )
+                                    Text(
+                                        text = "${preset.gpuWorkloadPercent}% GPU",
+                                        fontSize = 9.sp,
+                                        color = if (preset.gpuWorkloadPercent <= 50) CyberGreen else TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. Device Hardware Performance Information (e.g. Poco C71 support)
+        item {
+            CyberCard(borderColor = DarkCardBorder) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Memory,
+                                contentDescription = "Specs",
+                                tint = CyberPink,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "DEVICE HARDWARE SPECS",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Refresh",
+                            tint = TextSecondary,
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clickable { viewModel.refreshState() }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = "Device Model", fontSize = 11.sp, color = TextMuted)
+                            Text(text = deviceSpec.deviceName, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(text = "Android OS", fontSize = 11.sp, color = TextMuted)
+                            Text(text = "${deviceSpec.androidVersion} (API ${deviceSpec.apiLevel})", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = TextPrimary)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = "CPU & Cores", fontSize = 11.sp, color = TextMuted)
+                            Text(text = "${deviceSpec.cpuCores} Cores (${deviceSpec.cpuArch})", fontSize = 12.sp, color = TextPrimary)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(text = "Display Refresh", fontSize = 11.sp, color = TextMuted)
+                            Text(text = "${deviceSpec.refreshRateHz} Hz (${deviceSpec.screenWidth}x${deviceSpec.screenHeight})", fontSize = 12.sp, color = CyberCyan)
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column {
+                            Text(text = "Thermal State", fontSize = 11.sp, color = TextMuted)
+                            Text(text = deviceSpec.thermalStatus, fontSize = 12.sp, color = CyberGreen)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(text = "Battery Level", fontSize = 11.sp, color = TextMuted)
+                            Text(text = "${deviceSpec.batteryPercent}% ${if (deviceSpec.isCharging) "(Charging)" else ""}", fontSize = 12.sp, color = TextPrimary)
+                        }
+                    }
+                }
+            }
+        }
+
+        // 7. Safety, Anti-Cheat, and Platform Compliance Notice
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, DarkCardBorder, RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp),
+                colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = DarkSurface)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = "Safe",
+                        tint = NeonPurpleLight,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Legitimate & Account Safe",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Blox Booster operates exclusively via native Android OS display scaling & SurfaceFlinger color grading. We never modify Roblox game files, inject hooks, or violate Terms of Service.",
+                            fontSize = 10.sp,
+                            color = TextSecondary,
+                            lineHeight = 15.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+
+    // Permission explanation dialog for Overlay Window
+    if (showOverlayPermDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showOverlayPermDialog = false },
+            containerColor = DarkSurfaceElevated,
+            title = {
+                Text(
+                    text = "Display Over Other Apps Permission",
+                    color = TextPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Why Blox Booster requests this permission:",
+                        color = TextSecondary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "1. To draw the floating real-time FPS & Stability HUD over Roblox during gameplay.\n" +
+                                "2. To apply the lightweight, zero-GPU Potato Visual color enhancement matrix so Roblox textures look vivid and clear.\n\n" +
+                                "Blox Booster does NOT read touch gestures inside Roblox or modify Roblox memory.",
+                        color = TextSecondary,
+                        fontSize = 12.sp,
+                        lineHeight = 18.sp
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showOverlayPermDialog = false
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NeonPurple, contentColor = Color.Black)
+                ) {
+                    Text("Grant in Settings", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                OutlinedButton(
+                    onClick = { showOverlayPermDialog = false },
+                    border = androidx.compose.foundation.BorderStroke(1.dp, TextMuted)
+                ) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+}

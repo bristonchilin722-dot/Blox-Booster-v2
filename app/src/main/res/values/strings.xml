@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Blox Booster</string>
+    <string name="app_tagline">Potato Graphics &amp; Visual Optimizer</string>
+    <string name="launch_roblox">Launch Roblox</string>
+    <string name="roblox_not_installed">Roblox is not installed on this device</string>
+    <string name="potato_visual_mode">Potato Visual Mode</string>
+    <string name="potato_visual_desc">Aggressive lightweight graphics rendering with sharp visual enhancement</string>
+    <string name="performance_mode">Performance Mode</string>
+    <string name="performance_desc">Aggressive memory reclaim &amp; refresh sync for smooth frametimes</string>
+    <string name="visual_mode">Visual Enhancement Mode</string>
+    <string name="visual_desc">Contrast, vibrance &amp; gamma boost with zero GPU rendering overhead</string>
+    <string name="fps_monitor">FPS &amp; Stability Monitor</string>
+    <string name="floating_overlay">Floating Performance HUD</string>
+    <string name="resolution_optimizer">Resolution Optimizer</string>
+    <string name="resolution_desc">Custom display scaling to relieve low-end GPU fillrate</string>
+    <string name="device_specs">Device Performance Info</string>
+    <string name="graphics_settings">Graphics Settings</string>
+    <string name="shizuku_status">ADB / Shizuku Integration</string>
+    <string name="system_overlay_perm">Display Over Other Apps</string>
+</resources>
